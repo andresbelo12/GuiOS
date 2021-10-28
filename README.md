@@ -7,7 +7,7 @@ For directories usage use the following commands:
     ac "application name" [pid] // To close an application or instance of the application
     al "application name" // To list the instances of "application name"
 
-    lg "module name"// To get the log of a module
+    log [gui][files][kernel]// To get the log of a module
 
     exit // To stop all the program
     

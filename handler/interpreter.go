@@ -6,26 +6,31 @@ import (
 	"strings"
 
 	"github.com/andresbelo12/GuiOS/model"
+	//kernelHandler "github.com/andresbelo12/KernelOS/handler"
 	kernelModel "github.com/andresbelo12/KernelOS/model"
-	kernelHandler "github.com/andresbelo12/KernelOS/handler"
 )
 
 type Interpreter struct {
 	Connection *kernelModel.ClientConnection
+	ListenerChannel chan kernelModel.Message
+	WaitingResponse bool
 }
 
-func CreateInterpreter(connection *kernelModel.ClientConnection) (interpreter Interpreter) {
+func CreateInterpreter(connection *kernelModel.ClientConnection, channel chan kernelModel.Message) (interpreter Interpreter) {
 	interpreter.Connection = connection
+	interpreter.ListenerChannel = channel
 	return
 }
 
-func (interpreter Interpreter) ProcessCommand(input string) (response model.OperationResponse) {
+func (interpreter *Interpreter) ProcessCommand(input string) (response model.OperationResponse) {
 	
 	switch commandData := strings.Split(input, " "); commandData[0] {
 	case "dc":
 		response = interpreter.DirectoryCreate(commandData)
 	case "dd":
 		response = interpreter.DirectoryDelete(commandData)
+	case "log":
+		response = interpreter.ReadLogs(commandData)
 	case "stop":
 		if response = Stop(); response.Success{
 			os.Exit(0)
@@ -37,43 +42,25 @@ func (interpreter Interpreter) ProcessCommand(input string) (response model.Oper
 	return
 }
 
-func (interpreter Interpreter)DirectoryCreate(commandData []string) (response model.OperationResponse) {
-	if len(commandData) < 2 {
-		response.Message = "missing argument \"directory\"name. Example of usage (create logs directory): dc logs"
-		return
+func (interpreter *Interpreter) ProcessResponse() (success bool, message string) {
+	fmt.Println("Waiting response...")
+	interpreter.WaitingResponse = true
+	serverResponse := <-interpreter.ListenerChannel
+	interpreter.WaitingResponse = false
+
+	if serverResponse.Command == kernelModel.CMD_STOP {
+		return false, serverResponse.Message
 	}
 
-	message := kernelModel.Message{
-		Command: kernelModel.CMD_SEND,
-		Source: kernelModel.MD_GUI,
-		Destination: kernelModel.MD_FILES,
-		Message: "create:"+commandData[1],
+	messageBody := strings.Split(serverResponse.Message, ";")
+	message = strings.Split(messageBody[2], ":")[1]
+	if messageBody[0] == "response:true" {
+		success = true
 	}
 
-	if err := kernelHandler.WriteServer(interpreter.Connection, &message); err != nil{
-		response.Message = err.Error()
-		return
-	}
-
-	
-
-	fmt.Println("Creating directory: " + commandData[1])
-	response.Message = "directory " + commandData[1] + " created"
-	response.Success = true
 	return
 }
 
-func (interpreter Interpreter)DirectoryDelete(commandData []string) (response model.OperationResponse) {
-	if len(commandData) < 2 {
-		response.Message = "missing argument \"directory\"name. Example of usage (delete logs directory): dd logs"
-		return
-	}
-
-	fmt.Println("Deleting directory: " + commandData[1])
-	response.Message = "directory " + commandData[1] + " deleted"
-	response.Success = true
-	return
-}
 
 func Stop()(response model.OperationResponse){
 	response.Success = true

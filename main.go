@@ -15,13 +15,13 @@ const (
 
 func main() {
 
-	
-	listener := handler.CreateListener()
+	channel := make(chan kernelModel.Message)
 	connection := connectToServer()
-	interpreter := handler.CreateInterpreter(&connection)
+	interpreter := handler.CreateInterpreter(&connection, channel)
+	listener := handler.CreateListener(&interpreter)
 
 	go handler.LaunchGUI(&interpreter)
-	kernelHandler.ListenServer(&interpreter, listener, &connection)
+	kernelHandler.ListenServer(listener, &connection)
 
 }
 
